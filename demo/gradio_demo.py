@@ -1,5 +1,5 @@
 """
-VibeVoice Gradio Demo - High-Quality Dialogue Generation Interface with Streaming Support
+RSR TTS - High-Quality Dialogue Generation Interface with Streaming Support
 """
 
 import argparse
@@ -31,9 +31,9 @@ logging.set_verbosity_info()
 logger = logging.get_logger(__name__)
 
 
-class VibeVoiceDemo:
+class RSRTTSDemo:
     def __init__(self, model_path: str, device: str = "cuda", inference_steps: int = 5):
-        """Initialize the VibeVoice demo with model loading."""
+        """Initialize the RSR TTS demo with model loading."""
         self.model_path = model_path
         self.device = device
         self.inference_steps = inference_steps
@@ -45,7 +45,7 @@ class VibeVoiceDemo:
         self.load_example_scripts()  # Load example scripts
         
     def load_model(self):
-        """Load the VibeVoice model and processor."""
+        """Load the TTS model and processor."""
         print(f"Loading processor & model from {self.model_path}")
         # Normalize potential 'mpx'
         if self.device.lower() == "mpx":
@@ -182,6 +182,10 @@ class VibeVoiceDemo:
                                  speaker_2: str = None,
                                  speaker_3: str = None,
                                  speaker_4: str = None,
+                                 speaker_1_upload: str = None,
+                                 speaker_2_upload: str = None,
+                                 speaker_3_upload: str = None,
+                                 speaker_4_upload: str = None,
                                  cfg_scale: float = 1.3) -> Iterator[tuple]:
         try:
             
@@ -201,19 +205,36 @@ class VibeVoiceDemo:
                 self.is_generating = False
                 raise gr.Error("Error: Number of speakers must be between 1 and 4.")
             
-            # Collect selected speakers
-            selected_speakers = [speaker_1, speaker_2, speaker_3, speaker_4][:num_speakers]
+            # --- New Logic: Handle custom uploads and dropdowns ---
+            speaker_dropdowns = [speaker_1, speaker_2, speaker_3, speaker_4]
+            speaker_uploads = [speaker_1_upload, speaker_2_upload, speaker_3_upload, speaker_4_upload]
             
-            # Validate speaker selections
-            for i, speaker in enumerate(selected_speakers):
-                if not speaker or speaker not in self.available_voices:
+            selected_audio_paths = [] # This will store the final paths to load
+            selected_speaker_names_for_log = [] # For logging
+            
+            # Validate and select audio source for each speaker
+            for i in range(num_speakers):
+                upload_path = speaker_uploads[i]
+                dropdown_name = speaker_dropdowns[i]
+                
+                if upload_path and os.path.exists(upload_path):
+                    # User uploaded a custom voice
+                    selected_audio_paths.append(upload_path)
+                    selected_speaker_names_for_log.append(f"Custom (Speaker {i+1})")
+                elif dropdown_name and dropdown_name in self.available_voices:
+                    # User selected from dropdown, and no upload was provided
+                    selected_audio_paths.append(self.available_voices[dropdown_name])
+                    selected_speaker_names_for_log.append(dropdown_name)
+                else:
+                    # No valid selection for this speaker
                     self.is_generating = False
-                    raise gr.Error(f"Error: Please select a valid speaker for Speaker {i+1}.")
-            
+                    raise gr.Error(f"Error: Please select a default voice or upload a custom voice for Speaker {i+1}.")
+            # --- End New Logic ---
+
             # Build initial log
             log = f"🎙️ Generating podcast with {num_speakers} speakers\n"
             log += f"📊 Parameters: CFG Scale={cfg_scale}, Inference Steps={self.inference_steps}\n"
-            log += f"🎭 Speakers: {', '.join(selected_speakers)}\n"
+            log += f"🎭 Speakers: {', '.join(selected_speaker_names_for_log)}\n"
             
             # Check for stop signal
             if self.stop_generation:
@@ -223,12 +244,11 @@ class VibeVoiceDemo:
             
             # Load voice samples
             voice_samples = []
-            for speaker_name in selected_speakers:
-                audio_path = self.available_voices[speaker_name]
+            for i, audio_path in enumerate(selected_audio_paths):
                 audio_data = self.read_audio(audio_path)
                 if len(audio_data) == 0:
                     self.is_generating = False
-                    raise gr.Error(f"Error: Failed to load audio for {speaker_name}")
+                    raise gr.Error(f"Error: Failed to load audio for {selected_speaker_names_for_log[i]}")
                 voice_samples.append(audio_data)
             
             # log += f"✅ Loaded {len(voice_samples)} voice samples\n"
@@ -258,7 +278,7 @@ class VibeVoiceDemo:
             
             formatted_script = '\n'.join(formatted_script_lines)
             log += f"📝 Formatted script with {len(formatted_script_lines)} turns\n\n"
-            log += "🔄 Processing with VibeVoice (streaming mode)...\n"
+            log += "🔄 Processing (streaming mode)...\n"
             
             # Check for stop signal before processing
             if self.stop_generation:
@@ -598,7 +618,7 @@ class VibeVoiceDemo:
             return len(speakers)
     
 
-def create_demo_interface(demo_instance: VibeVoiceDemo):
+def create_demo_interface(demo_instance: RSRTTSDemo):
     """Create the Gradio interface with streaming support."""
     
     # Custom CSS for high-end aesthetics with lighter theme
@@ -835,7 +855,7 @@ def create_demo_interface(demo_instance: VibeVoiceDemo):
     .slider-container input[type="range"] { position: relative; z-index: 0 !important; }
 
     /* ========================= */
-    /*        Dark Mode          */
+    /* Dark Mode          */
     /* ========================= */
     :root { color-scheme: dark; }
 
@@ -939,7 +959,7 @@ def create_demo_interface(demo_instance: VibeVoiceDemo):
     """
     
     with gr.Blocks(
-        title="VibeVoice - AI Podcast Generator",
+        title="RSR TTS",
         css=custom_css,
         theme=gr.themes.Soft(
             primary_hue="blue",
@@ -951,8 +971,7 @@ def create_demo_interface(demo_instance: VibeVoiceDemo):
         # Header
         gr.HTML("""
         <div class="main-header">
-            <h1>🎙️ Vibe Podcasting </h1>
-            <p>Generating Long-form Multi-speaker AI Podcast with VibeVoice</p>
+            <h1>RSR TTS</h1>
         </div>
         """)
         
@@ -975,20 +994,27 @@ def create_demo_interface(demo_instance: VibeVoiceDemo):
                 gr.Markdown("### 🎭 **Speaker Selection**")
                 
                 available_speaker_names = list(demo_instance.available_voices.keys())
-                # default_speakers = available_speaker_names[:4] if len(available_speaker_names) >= 4 else available_speaker_names
                 default_speakers = ['en-Alice_woman', 'en-Carter_man', 'en-Frank_man', 'en-Maya_woman']
 
                 speaker_selections = []
+                speaker_uploads = []
+                speaker_groups = []
                 for i in range(4):
-                    default_value = default_speakers[i] if i < len(default_speakers) else None
-                    speaker = gr.Dropdown(
-                        choices=available_speaker_names,
-                        value=default_value,
-                        label=f"Speaker {i+1}",
-                        visible=(i < 2),  # Initially show only first 2 speakers
-                        elem_classes="speaker-item"
-                    )
-                    speaker_selections.append(speaker)
+                    with gr.Group(visible=(i < 2), elem_classes="speaker-item") as speaker_group:
+                        default_value = default_speakers[i] if i < len(default_speakers) else None
+                        speaker_dd = gr.Dropdown(
+                            choices=available_speaker_names,
+                            value=default_value,
+                            label=f"Speaker {i+1} (Default Voice)",
+                        )
+                        speaker_up = gr.Audio(
+                            label=f"OR Upload Custom Voice for Speaker {i+1}",
+                            type="filepath",  # Use filepath to get a temp path to the uploaded file
+                            sources=["upload", "microphone"],
+                        )
+                    speaker_selections.append(speaker_dd)
+                    speaker_uploads.append(speaker_up)
+                    speaker_groups.append(speaker_group)
                 
                 # Advanced settings
                 gr.Markdown("### ⚙️ **Advanced Settings**")
@@ -1118,7 +1144,7 @@ Or paste text directly and it will auto-assign speakers.""",
         num_speakers.change(
             fn=update_speaker_visibility,
             inputs=[num_speakers],
-            outputs=speaker_selections
+            outputs=speaker_groups # Target the groups for visibility
         )
         
         # Main generation function with streaming
@@ -1126,8 +1152,10 @@ Or paste text directly and it will auto-assign speakers.""",
             """Wrapper function to handle the streaming generation call."""
             try:
                 # Extract speakers and parameters
-                speakers = speakers_and_params[:4]  # First 4 are speaker selections
-                cfg_scale = speakers_and_params[4]   # CFG scale
+                # 4 dropdowns + 4 uploads + 1 cfg_scale = 9 params
+                dropdown_selections = speakers_and_params[0:4]
+                upload_selections = speakers_and_params[4:8]
+                cfg_scale = speakers_and_params[8]
                 
                 # Clear outputs and reset visibility at start
                 yield None, gr.update(value=None, visible=False), "🎙️ Starting generation...", gr.update(visible=True), gr.update(visible=False), gr.update(visible=True)
@@ -1138,10 +1166,14 @@ Or paste text directly and it will auto-assign speakers.""",
                 for streaming_audio, complete_audio, log, streaming_visible in demo_instance.generate_podcast_streaming(
                     num_speakers=int(num_speakers),
                     script=script,
-                    speaker_1=speakers[0],
-                    speaker_2=speakers[1],
-                    speaker_3=speakers[2],
-                    speaker_4=speakers[3],
+                    speaker_1=dropdown_selections[0],
+                    speaker_2=dropdown_selections[1],
+                    speaker_3=dropdown_selections[2],
+                    speaker_4=dropdown_selections[3],
+                    speaker_1_upload=upload_selections[0],
+                    speaker_2_upload=upload_selections[1],
+                    speaker_3_upload=upload_selections[2],
+                    speaker_4_upload=upload_selections[3],
                     cfg_scale=cfg_scale
                 ):
                     final_log = log
@@ -1190,7 +1222,7 @@ Or paste text directly and it will auto-assign speakers.""",
             queue=False
         ).then(
             fn=generate_podcast_wrapper,
-            inputs=[num_speakers, script_input] + speaker_selections + [cfg_scale],
+            inputs=[num_speakers, script_input] + speaker_selections + speaker_uploads + [cfg_scale], # Pass both lists
             outputs=[audio_output, complete_audio_output, log_output, streaming_status, generate_btn, stop_btn],
             queue=True  # Enable Gradio's built-in queue
         )
@@ -1263,7 +1295,7 @@ Or paste text directly and it will auto-assign speakers.""",
         else:
             # Fallback to a simple default example if no scripts loaded
             example_scripts = [
-                [1, "Speaker 1: Welcome to our AI podcast demonstration! This is a sample script showing how VibeVoice can generate natural-sounding speech."]
+                [1, "Speaker 1: Welcome to our AI podcast demonstration! This is a sample script showing how the model can generate natural-sounding speech."]
             ]
         
         gr.Examples(
@@ -1272,16 +1304,7 @@ Or paste text directly and it will auto-assign speakers.""",
             label="Try these example scripts:"
         )
 
-        # --- Risks & limitations (footer) ---
-        gr.Markdown(
-            """
-## Risks and limitations
 
-While efforts have been made to optimize it through various techniques, it may still produce outputs that are unexpected, biased, or inaccurate. VibeVoice inherits any biases, errors, or omissions produced by its base model (specifically, Qwen2.5 1.5b in this release).
-Potential for Deepfakes and Disinformation: High-quality synthetic speech can be misused to create convincing fake audio content for impersonation, fraud, or spreading disinformation. Users must ensure transcripts are reliable, check content accuracy, and avoid using generated content in misleading ways. Users are expected to use the generated content and to deploy the models in a lawful manner, in full compliance with all applicable laws and regulations in the relevant jurisdictions. It is best practice to disclose the use of AI when sharing AI-generated content.
-            """,
-            elem_classes="generation-card",  # 可选：复用卡片样式
-        )
     return interface
 
 
@@ -1303,12 +1326,12 @@ def convert_to_16_bit_wav(data):
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="VibeVoice Gradio Demo")
+    parser = argparse.ArgumentParser(description="RSR TTS Gradio Demo")
     parser.add_argument(
         "--model_path",
         type=str,
-        default="/tmp/vibevoice-model",
-        help="Path to the VibeVoice model directory",
+        default="/models/VibeVoice-large",
+        help="Path to the TTS model directory",
     )
     parser.add_argument(
         "--device",
@@ -1343,10 +1366,10 @@ def main():
     
     set_seed(42)  # Set a fixed seed for reproducibility
 
-    print("🎙️ Initializing VibeVoice Demo with Streaming Support...")
+    print("🎙️ Initializing RSR TTS Demo with Streaming Support...")
     
     # Initialize demo instance
-    demo_instance = VibeVoiceDemo(
+    demo_instance = RSRTTSDemo(
         model_path=args.model_path,
         device=args.device,
         inference_steps=args.inference_steps
@@ -1367,7 +1390,7 @@ def main():
             max_size=20,  # Maximum queue size
             default_concurrency_limit=1  # Process one request at a time
         ).launch(
-            share=args.share,
+            share=True,
             # server_port=args.port,
             server_name="0.0.0.0" if args.share else "127.0.0.1",
             show_error=True,

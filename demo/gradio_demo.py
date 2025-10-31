@@ -953,8 +953,8 @@ def create_demo_interface(demo_instance: RSRTTSDemo):
     .settings-card, .generation-card {
         -webkit-backdrop-filter: none !important;
         backdrop-filter: none !important;
-        position: relative;
-        z-index: 0;
+        /* position: relative;  <-- REMOVED to fix dropdown clipping */
+        /* z-index: 0;          <-- REMOVED to fix dropdown clipping */
     }
     """
     

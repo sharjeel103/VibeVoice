@@ -1,2 +1,2 @@
-Speaker 1: I heard there’s big news in TTS lately?
-Speaker 2: Yes! Microsoft Research just open-sourced VibeVoice. The model can generate speech up to 90 minutes long, with smooth delivery and rich emotion — it’s absolutely amazing.
+Speaker 1: I've been feeling so unproductive lately, I just can't seem to get started on my project. 
+Speaker 2: I know that feeling. I find that breaking the project down into tiny, manageable tasks really helps. That way, even finishing one small part feels like a win and builds momentum.

@@ -1473,7 +1473,7 @@ def parse_args():
         help="Port to run the demo on",
     )
     parser.add_argument(
-        "--8bit",
+        "--use_8bit",
         action="store_true",
         help="Enable 8-bit quantization for the LLM component (requires bitsandbytes)",
     )
@@ -1494,7 +1494,7 @@ def main():
         model_path=args.model_path,
         device=args.device,
         inference_steps=args.inference_steps,
-        use_8bit=args.8bit  # <-- Pass the flag
+        use_8bit=args.use_8bit  # <-- Pass the flag
     )
     
     # Create interface
@@ -1503,7 +1503,7 @@ def main():
     print(f"🚀 Launching demo on port {args.port}")
     print(f"📁 Model path: {args.model_path}")
     print(f"🎭 Available voices: {len(demo_instance.available_voices)}")
-    print(f"🔥 8-bit LLM Quantization: {'ENABLED' if args.8bit else 'DISABLED'}")
+    print(f"🔥 8-bit LLM Quantization: {'ENABLED' if args.use_8bit else 'DISABLED'}")
     print(f"🔴 Streaming mode: ENABLED")
     print(f"🔒 Session isolation: ENABLED")
     

@@ -21,6 +21,10 @@ import os
 import traceback
 import pyrubberband as pyrb
 
+# Set environment variables for cuBLAS compatibility with bitsandbytes on T4 GPUs
+os.environ.setdefault("CUDA_VISIBLE_DEVICES", os.environ.get("CUDA_VISIBLE_DEVICES", ""))
+os.environ.setdefault("BITSANDBYTES_NOWELCOME", "1")
+
 from vibevoice.modular.configuration_vibevoice import VibeVoiceConfig
 from vibevoice.modular.modeling_vibevoice_inference import VibeVoiceForConditionalGenerationInference
 from vibevoice.processor.vibevoice_processor import VibeVoiceProcessor
@@ -166,6 +170,39 @@ class RSRTTSDemo:
             else:
                 raise e
         self.model.eval()
+        
+        # Fix for cuBLAS error with 8-bit quantization on T4 GPUs
+        # Ensure inputs are contiguous before quantized operations
+        if self.use_8bit:
+            try:
+                import bitsandbytes as bnb
+                from bitsandbytes.nn import Linear8bitLt
+                
+                # Disable problematic CUDA optimizations that can interfere with quantized ops
+                if torch.backends.cudnn.is_available():
+                    torch.backends.cudnn.benchmark = False
+                    torch.backends.cudnn.deterministic = True
+                
+                # Store original forward method of Linear8bitLt
+                original_linear8bit_forward = Linear8bitLt.forward
+                
+                def patched_linear8bit_forward(self_linear, input, *args, **kwargs):
+                    # Ensure input is contiguous before quantized matrix multiplication
+                    # This fixes cuBLAS errors on T4 GPUs with bitsandbytes
+                    if input is not None and not input.is_contiguous():
+                        input = input.contiguous()
+                    # Call original forward with contiguous tensor
+                    return original_linear8bit_forward(self_linear, input, *args, **kwargs)
+                
+                # Patch the Linear8bitLt class to ensure contiguous inputs
+                Linear8bitLt.forward = patched_linear8bit_forward
+                
+                print("✅ Applied cuBLAS compatibility patch for 8-bit quantization")
+                print("   - Ensured inputs are contiguous before quantized operations")
+                print("   - Disabled CUDA optimizations that may interfere")
+            except Exception as e:
+                print(f"⚠️  Warning: Could not apply cuBLAS patch: {e}")
+                print("   The model may still work, but cuBLAS errors may occur.")
         
         # Use SDE solver by default
         self.model.model.noise_scheduler = self.model.model.noise_scheduler.from_config(

@@ -33,7 +33,7 @@ logger = logging.get_logger(__name__)
 
 
 class RSRTTSDemo:
-    def __init__(self, model_path: str, device: str = "cuda", inference_steps: int = 5):
+    def __init__(self, model_path: str, device: str = "cuda", inference_steps: int = 5, use_8bit: bool = False):
         """Initialize the RSR TTS demo with model loading."""
         self.model_path = model_path
         self.device = device
